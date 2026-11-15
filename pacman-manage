@@ -452,7 +452,6 @@ fzfShow() {
 				--track \
 				--cycle \
 				--color base16"
-	#echo $*
 	listArg="-$1"
 	previewArg="-$2"
 	actionArg="-$3"
@@ -460,10 +459,8 @@ fzfShow() {
 
 	if [[ -n "$packages" ]]; then
 		packages=$(echo $packages)
-		echo "Executed: yay $actionArg $packages"
-		yay $actionArg $packages
+		exec packageOp
 	fi
-	#sleep 5
 	menu $type
 }
 
@@ -473,18 +470,20 @@ menu() {
 	options=()
 	optionsText=()
 	option=
-	echo "Pacman Management"
+	printf '\e[1m'; echo "Pacman Management"
+	printf '\e[0m'; echo "-----------------"
 	echo ""
 	case $type in
 		main)
 			options=("installed" "repos" "orphans" "cache" "exit")
 			optionsText=("➔ Show installed packages" "➔ Browse repositories/AUR" "➔ Manage orphaned dependencies" "➔ Clear Pacman cache" "✕ Exit")
 			option=$(list "Choose an action" "${optionsText[@]}")
+			echo ""
 			case ${options[$option]} in
 				installed) menu installed;;
 				repos) menu repos;;
 				orphans) menu orphans;;
-				cache) echo "Sorry! This feature hasn't been implemented yet. :/";; # TODO: Implement cache clearing
+				cache) exec clearCache;;
 				exit) exit 0;
 			esac
 			;;
@@ -492,6 +491,7 @@ menu() {
 			options=("all" "explicit" "foreign" "back")
 			optionsText=("➔ Show all installed packages" "➔ Show explicitly installed packages" "➔ Show external (e.g. AUR) packages" "← Back")
 			option=$(list "Choose an action" "${optionsText[@]}")
+			echo ""
 			case ${options[$option]} in
 				all) fzfShow Qq Qi Rns;;
 				explicit) fzfShow Qqe Qi Rns;;
@@ -503,6 +503,7 @@ menu() {
 			options=("both" "reposOnly" "aurOnly" "back")
 			optionsText=("➔ Browse repos and AUR" "➔ Browse repos only" "➔ Browse AUR only" "← Back")
 			option=$(list "Choose an action" "${optionsText[@]}")
+			echo ""
 			case ${options[$option]} in
 				both) fzfShow Slq Si Syu;;
 				reposOnly) fzfShow SlqN Si Syu;;
@@ -514,12 +515,41 @@ menu() {
 			options=("view" "remove" "back")
 			optionsText=("➔ View orphaned dependencies" "➔ Remove all orphans" "← Back")
 			option=$(list "Choose an action" "${optionsText[@]}")
+			echo ""
 			case ${options[$option]} in
 				view) fzfShow Qdtq Qi Rns;;
-				remove) echo "Removing all orphaned dependencies..."; pacman -Qdtq | sudo pacman -Rns -;;
+				remove) exec removeOrphans;;
 				back) menu main;;
 			esac
 	esac
+}
+
+exec() {
+	# Executes some predefined commands and prompts you to press Enter afterwards
+	command=$1
+	clear
+	printf '\e[1;36m'
+	echo -n "Executed: "
+	case $command in
+		removeOrphans)
+			echo "Remove all orphan dependencies"; printf '\e[0m'
+			if pacman -Qdtq; then
+				pacman -Qdtq | pacman -Rns -
+			else
+				echo "No orphaned dependencies found!"
+			fi
+		;;
+		clearCache)
+			echo "Clearing pacman cache"; printf '\e[0m'
+			echo "Sorry! This feature hasn't been implemented yet. :/";; # TODO: Implement cache clearing
+		packageOp)
+			echo "yay $actionArg $packages"; printf '\e[0m'
+			yay $actionArg $packages # I'm abusing Bash's default global variables so hard
+	esac
+	echo ""; printf '\e[1;36m\e[?25l'
+	[[ $? == 0 ]] && echo "Operation completed successfully." || echo "Operation failed with code $?."
+	printf '\e[0m'; read -p "Press Enter to return to menu."
+	menu $type
 }
 
 menu main
