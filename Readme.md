@@ -7,7 +7,7 @@ Essentially a TUI frontend written in Bash to pacman/yay that makes it easier to
 * View all installed packages (includes filters such as explicitly installed and foreign (e.g. from AUR)), with ability to uninstall packages
 * Browse online repos and AUR
 * View/uninstall orphaned dependencies
-* (not implemented yet) Clear Pacman's cache
+* Clear Pacman's cache
 
 ## Requirements
 

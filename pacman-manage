@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# BEGIN bash-tui-toolkit
 ###############################################################################
 #                                                                             #
 # Bash TUI Toolkit                                                            #
@@ -401,6 +402,7 @@ open_link() {
     fi
     return 0
 }
+# END bash-tui-toolkit
 
 #########################################
 # pacman-manage
@@ -409,35 +411,16 @@ open_link() {
 
 # Functions included:
 #
-# Browse all installed packages with filters such as explicitly installed,
-# orphaned dependencies, etc.
-#
-# Commands:
-# List all installed packages:					pacman -Qq
-# List all explicitly installed packages:		pacman -Qqe
-# List all foreign (i.e. AUR packages):			pacman -Qqm
-# List all orphaned packages:					pacman -Qdtq
-# Remove selected package(s) and dependencies:	yay -Rns <pkgname>
-#
-# Browse/install packages from repositories and aur (via yay)
-#
-# Commands:
-# List all packages from repos and aur:	yay -Slq
-# List all packages from repos only:	yay -SNlq
-# List all packages from aur only:		yay -Slqa
-# Install selected package(s):			yay -Syu <pkgname> (Question: use -Syu or -S?)
-#
-# Clear caches (including AUR-related data)
-#
-# Note: This should check for directories in the pacman cache dir and remove them first
+# * Browse all installed packages with filters such as explicitly installed,
+#   orphaned dependencies, etc. Packages can be uninstalled from the menu.
+# * Browse/install packages from repositories and aur (via yay)
+# * Clear caches (including AUR-related data)
+#   Note: This should check for directories in the pacman cache dir and remove them first
 #
 # Remove stale cache (uninstalled packages):	yay -Sc
 # Remove ALL cache (INCLUDING INSTALLED):		yay -Scc
 #
-# Uses Fzf for browsing package lists.
-#
-# For lists of installed packages, pressing Enter will uninstall the package
-# For lists from repositories, pressing Enter installs the package
+# Uses Fzf for browsing package lists. All operations use yay (because AUR).
 
 fzfShow() {
 	# Simple function to make it way easier to show things in fzf
@@ -483,7 +466,7 @@ menu() {
 				installed) menu installed;;
 				repos) menu repos;;
 				orphans) menu orphans;;
-				cache) exec clearCache;;
+				cache) menu clearCache;;
 				exit) exit 0;
 			esac
 			;;
@@ -521,6 +504,18 @@ menu() {
 				remove) exec removeOrphans;;
 				back) menu main;;
 			esac
+			;;
+		clearCache)
+			options=("clear" "clearAll" "back")
+			optionsText=("➔ Clear cache (only uninstalled packages)" "➔ Clear ALL cached packages" "← Back")
+			option=$(list "Choose an action" "${optionsText[@]}")
+			echo ""
+			case ${options[$option]} in
+				clear) exec clearCache;;
+				clearAll) exec clearAllCache;;
+				back) menu main;;
+			esac
+			;;
 	esac
 }
 
@@ -540,15 +535,31 @@ exec() {
 			fi
 		;;
 		clearCache)
-			echo "Clearing pacman cache"; printf '\e[0m'
-			echo "Sorry! This feature hasn't been implemented yet. :/";; # TODO: Implement cache clearing
+			echo "Clear pacman cache (uninstalled packages)"; printf '\e[0;1m'
+			# echo "Sorry! This feature hasn't been implemented yet. :/" # TODO: Implement cache clearing
+			if sudo ls /var/cache/pacman/pkg/*/ >/dev/null 2>&1 ; then
+				echo "Directories found within pacman cache. Cleaning up..."
+				sudo rm -rf /var/cache/pacman/pkg/*/
+			fi
+			printf '\e[0m'
+			yay -Sc
+			;;
+		clearAllCache)
+			echo "Clear pacman cache (ALL packages)"; printf '\e[0;1m'
+			if sudo ls /var/cache/pacman/pkg/*/ >/dev/null 2>%1 ; then
+				echo "Directories found within pacman cache. Cleaning up..."
+				sudo rm -rf /var/cache/pacman/pkg/*/
+			fi
+			printf '\e[0m'
+			yay -Scc
+			;;
 		packageOp)
 			echo "yay $actionArg $packages"; printf '\e[0m'
 			yay $actionArg $packages # I'm abusing Bash's default global variables so hard
 	esac
 	echo ""; printf '\e[1;36m\e[?25l'
 	[[ $? == 0 ]] && echo "Operation completed successfully." || echo "Operation failed with code $?."
-	printf '\e[0m'; read -p "Press Enter to return to menu."
+	printf '\e[0;1m'; read -p "Press Enter to return to menu."
 	menu $type
 }
 
