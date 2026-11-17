@@ -415,10 +415,6 @@ open_link() {
 #   orphaned dependencies, etc. Packages can be uninstalled from the menu.
 # * Browse/install packages from repositories and aur (via yay)
 # * Clear caches (including AUR-related data)
-#   Note: This should check for directories in the pacman cache dir and remove them first
-#
-# Remove stale cache (uninstalled packages):	yay -Sc
-# Remove ALL cache (INCLUDING INSTALLED):		yay -Scc
 #
 # Uses Fzf for browsing package lists. All operations use yay (because AUR).
 
@@ -449,6 +445,7 @@ fzfShow() {
 
 menu() {
 	clear
+	printf '\e[0m'
 	type=$1
 	options=()
 	optionsText=()
@@ -522,44 +519,53 @@ menu() {
 exec() {
 	# Executes some predefined commands and prompts you to press Enter afterwards
 	command=$1
+	code=0
 	clear
-	printf '\e[1;36m'
-	echo -n "Executed: "
+	printf '\e[1;36mExecuted: '
 	case $command in
 		removeOrphans)
-			echo "Remove all orphan dependencies"; printf '\e[0m'
+			printf 'Remove all orphan dependencies\e[0m\n'
 			if pacman -Qdtq; then
 				pacman -Qdtq | pacman -Rns -
+				code=$?
 			else
 				echo "No orphaned dependencies found!"
+				code=0
 			fi
 		;;
 		clearCache)
-			echo "Clear pacman cache (uninstalled packages)"; printf '\e[0;1m'
-			# echo "Sorry! This feature hasn't been implemented yet. :/" # TODO: Implement cache clearing
+			printf 'Clear pacman cache (uninstalled packages)\e[0m\n'
 			if sudo ls /var/cache/pacman/pkg/*/ >/dev/null 2>&1 ; then
 				echo "Directories found within pacman cache. Cleaning up..."
 				sudo rm -rf /var/cache/pacman/pkg/*/
+			else
+                echo "No directories within pacman cache."
 			fi
-			printf '\e[0m'
+			printf "\e[1;36mExecuting yay -Sc\e[0m\n"
 			yay -Sc
+			code=$?
 			;;
 		clearAllCache)
-			echo "Clear pacman cache (ALL packages)"; printf '\e[0;1m'
+			printf "Clear pacman cache (ALL packages)\e[0m\n"
+			echo "Checking for directories within pacman cache..."
 			if sudo ls /var/cache/pacman/pkg/*/ >/dev/null 2>%1 ; then
 				echo "Directories found within pacman cache. Cleaning up..."
 				sudo rm -rf /var/cache/pacman/pkg/*/
+			else
+                echo "No directories within pacman cache."
 			fi
-			printf '\e[0m'
+			printf "\e[1;36mExecuting yay -Scc\e[0m\n"
 			yay -Scc
+			code=$?
 			;;
 		packageOp)
-			echo "yay $actionArg $packages"; printf '\e[0m'
+			printf "yay $actionArg $packages\e[0m\n"
 			yay $actionArg $packages # I'm abusing Bash's default global variables so hard
+			code=$?
 	esac
-	echo ""; printf '\e[1;36m\e[?25l'
-	[[ $? == 0 ]] && echo "Operation completed successfully." || echo "Operation failed with code $?."
-	printf '\e[0;1m'; read -p "Press Enter to return to menu."
+	echo ""; printf '\e[1;32m\e[?25l'
+	[[ $code == 0 ]] && printf "Operation completed successfully.\e[0;1m\n" || printf "\e[33mOperation failed.\e[0;1m\n"
+	read -p "Press Enter to return to menu."
 	menu $type
 }
 
